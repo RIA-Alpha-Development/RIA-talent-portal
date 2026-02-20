@@ -1,0 +1,28 @@
+{
+  "name": "ria-talent-portal-(cloud-sql-ready)-frontend",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview"
+  },
+  "dependencies": {
+    "react": "latest",
+    "react-dom": "latest",
+    "lucide-react": "latest",
+    "recharts": "latest",
+    "clsx": "latest",
+    "tailwind-merge": "latest",
+    "@google/genai": "latest",
+    "mammoth": "latest",
+    "pdfjs-dist": "latest"
+  },
+  "devDependencies": {
+    "@types/node": "latest",
+    "@vitejs/plugin-react": "latest",
+    "typescript": "latest",
+    "vite": "latest"
+  }
+}

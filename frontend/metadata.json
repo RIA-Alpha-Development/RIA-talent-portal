@@ -1,0 +1,8 @@
+
+{
+  "name": "RIA Talent Portal (Cloud SQL Ready)",
+  "description": "Enterprise ATS for Real Investment Advice. Configured for Google Cloud Run with Cloud SQL (PostgreSQL) backend integration. Admin: admin@ria.com / Riafinance123",
+  "requestFramePermissions": [
+    "camera"
+  ]
+}
