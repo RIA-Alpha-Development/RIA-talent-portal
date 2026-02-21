@@ -2,7 +2,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { X, Upload, Loader2, FileText, CheckCircle2, Sparkles, AlertCircle, BrainCircuit } from 'lucide-react';
 import { Job, Candidate, CandidateStage } from '../types';
-import { extractCandidateDetails, calculateMatchScore } from '../services/geminiService';
+import { apiService } from '../services/apiService';
 import mammoth from 'mammoth';
 import * as pdfjs from 'pdfjs-dist';
 
@@ -50,7 +50,7 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({ jobs, onClose, on
 
     setIsScoring(true);
     try {
-      const score = await calculateMatchScore(text, job.description);
+      const score = await apiService.calculateMatchScore(text, job.description);
       setFormData(prev => ({ ...prev, matchScore: score }));
     } catch (err) {
       console.error('Scoring error:', err);
@@ -110,7 +110,7 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({ jobs, onClose, on
       }
 
       setExtractedText(text);
-      const extracted = await extractCandidateDetails(text);
+      const extracted = await apiService.extractCandidateDetails(text);
       
       if (!extracted || (!extracted.name && !extracted.email)) {
         throw new Error('AI was unable to identify key information (Name/Email) from this document.');

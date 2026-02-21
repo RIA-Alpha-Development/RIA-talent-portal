@@ -29,7 +29,7 @@ import {
   Eye,
   BrainCircuit
 } from 'lucide-react';
-import { summarizeInterviewNotes } from '../services/geminiService';
+import { apiService } from '../services/apiService';
 import mammoth from 'mammoth';
 import * as pdfjs from 'pdfjs-dist';
 

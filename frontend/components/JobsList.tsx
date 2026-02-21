@@ -23,7 +23,7 @@ import {
   UserPlus
 } from 'lucide-react';
 import { Job, EmploymentType, WorkMode, UserRole, Candidate, CandidateStage, User, SalaryUnit } from '../types';
-import { generateJobDescription, extractJobDetails } from '../services/geminiService';
+import { apiService } from '../services/apiService';
 import PipelineBoard from './PipelineBoard';
 import AddCandidateModal from './AddCandidateModal';
 import mammoth from 'mammoth';
@@ -113,7 +113,7 @@ const JobsList: React.FC<JobsListProps> = ({
     if (!prompt) return;
     setIsLoading(true);
     try {
-      const desc = await generateJobDescription(prompt);
+      const desc = await apiService.generateJobDescription(prompt);
       setFormData(prev => ({ ...prev, description: desc }));
     } catch (err) {
       alert('Failed to generate description');
@@ -145,7 +145,7 @@ const JobsList: React.FC<JobsListProps> = ({
         return;
       }
 
-      const details = await extractJobDetails(text);
+      const details = await apiService.extractJobDetails(text);
       setFormData({
         title: details.title || '',
         description: details.description || text,

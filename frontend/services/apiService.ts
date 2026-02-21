@@ -268,4 +268,83 @@ export const apiService = {
       throw new Error(error.error || 'Failed to delete user');
     }
   },
+
+  // ========== AI Features ==========
+
+  async extractCandidateDetails(resumeText: string): Promise<{
+    name?: string;
+    email?: string;
+    phone?: string;
+    address?: string;
+    summary?: string;
+    skills?: string[];
+  }> {
+    const res = await fetch(`${API_BASE}/ai/extract-candidate`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeText }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Failed to extract candidate details' }));
+      throw new Error(error.error || 'Failed to extract candidate details');
+    }
+    return res.json();
+  },
+
+  async extractJobDetails(text: string): Promise<{
+    title?: string;
+    salaryMin?: number;
+    salaryMax?: number;
+    salaryUnit?: string;
+    type?: string;
+    mode?: string;
+    description?: string;
+  }> {
+    const res = await fetchWithAuth(`${API_BASE}/ai/extract-job`, {
+      method: 'POST',
+      body: JSON.stringify({ text }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Failed to extract job details' }));
+      throw new Error(error.error || 'Failed to extract job details');
+    }
+    return res.json();
+  },
+
+  async generateJobDescription(prompt: string): Promise<string> {
+    const res = await fetchWithAuth(`${API_BASE}/ai/generate-job-description`, {
+      method: 'POST',
+      body: JSON.stringify({ prompt }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Failed to generate job description' }));
+      throw new Error(error.error || 'Failed to generate job description');
+    }
+    const data = await res.json();
+    return data.description;
+  },
+
+  async calculateMatchScore(resumeText: string, jobDescription: string): Promise<number> {
+    const res = await fetch(`${API_BASE}/ai/calculate-match`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ resumeText, jobDescription }),
+    });
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.score || 0;
+  },
+
+  async summarizeInterviewNotes(transcript: string): Promise<string> {
+    const res = await fetchWithAuth(`${API_BASE}/ai/summarize-notes`, {
+      method: 'POST',
+      body: JSON.stringify({ transcript }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Failed to summarize notes' }));
+      throw new Error(error.error || 'Failed to summarize notes');
+    }
+    const data = await res.json();
+    return data.summary;
+  },
 };

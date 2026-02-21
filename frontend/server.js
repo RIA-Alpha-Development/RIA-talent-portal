@@ -723,6 +723,160 @@ app.post('/api-proxy', proxyLimiter, async (req, res) => {
 });
 
 // ============================================================================
+// AI EXTRACTION ENDPOINTS (Server-side Vertex AI calls)
+// ============================================================================
+
+// Helper function to call Vertex AI
+async function callVertexAI(prompt, model = 'gemini-1.5-flash') {
+  const accessToken = await getAccessToken(null);
+  if (!accessToken) throw new Error('Failed to get access token');
+
+  const apiUrl = `https://${GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/publishers/google/models/${model}:generateContent`;
+
+  const response = await fetch(apiUrl, {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${accessToken}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
+    })
+  });
+
+  if (!response.ok) {
+    const error = await response.text();
+    console.error('[AI] Vertex AI error:', error);
+    throw new Error(`Vertex AI error: ${response.status}`);
+  }
+
+  const data = await response.json();
+  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+}
+
+// Helper to extract JSON from AI response
+function extractJSON(text) {
+  const jsonMatch = text.match(/\{[\s\S]*\}/);
+  if (jsonMatch) return JSON.parse(jsonMatch[0]);
+  throw new Error('Could not parse JSON from response');
+}
+
+// POST /api/ai/extract-candidate - Extract candidate details from resume text
+app.post('/api/ai/extract-candidate', proxyLimiter, async (req, res) => {
+  const { resumeText } = req.body;
+  if (!resumeText) return res.status(400).json({ error: 'resumeText is required' });
+
+  try {
+    const prompt = `You are an expert HR assistant. Extract candidate information from the following resume text into a JSON object with these fields: name, email, phone, address, summary (brief professional summary), skills (array of strings).
+
+Resume Text:
+"""
+${resumeText}
+"""
+
+Return only the JSON object, no additional text.`;
+
+    const response = await callVertexAI(prompt);
+    const extracted = extractJSON(response);
+    res.json(extracted);
+  } catch (err) {
+    console.error('POST /api/ai/extract-candidate error:', err);
+    res.status(500).json({ error: 'Failed to extract candidate details', details: err.message });
+  }
+});
+
+// POST /api/ai/extract-job - Extract job details from document text
+app.post('/api/ai/extract-job', proxyLimiter, authenticateToken, async (req, res) => {
+  const { text } = req.body;
+  if (!text) return res.status(400).json({ error: 'text is required' });
+
+  try {
+    const prompt = `Extract job details from the following text and return as JSON with fields: title, salaryMin (number), salaryMax (number), salaryUnit (Annually or Per Hour), type (Full-time, Part-time, Contract, Contract-to-hire, or Intern), mode (Remote, Hybrid, or On-site), description. Text: ${text}
+
+Return only the JSON object, no additional text.`;
+    const response = await callVertexAI(prompt);
+    res.json(extractJSON(response));
+  } catch (err) {
+    console.error('POST /api/ai/extract-job error:', err);
+    res.status(500).json({ error: 'Failed to extract job details', details: err.message });
+  }
+});
+
+// POST /api/ai/generate-job-description - Generate job description from prompt
+app.post('/api/ai/generate-job-description', proxyLimiter, authenticateToken, async (req, res) => {
+  const { prompt } = req.body;
+  if (!prompt) return res.status(400).json({ error: 'prompt is required' });
+
+  try {
+    const aiPrompt = `Generate a professional job description based on this input: ${prompt}. Include sections for Responsibilities, Requirements, and Benefits. Format it nicely with headers and bullet points.`;
+    const description = await callVertexAI(aiPrompt);
+    res.json({ description });
+  } catch (err) {
+    console.error('POST /api/ai/generate-job-description error:', err);
+    res.status(500).json({ error: 'Failed to generate job description', details: err.message });
+  }
+});
+
+// POST /api/ai/calculate-match - Calculate match score between resume and job
+app.post('/api/ai/calculate-match', proxyLimiter, async (req, res) => {
+  const { resumeText, jobDescription } = req.body;
+  if (!resumeText || !jobDescription) {
+    return res.status(400).json({ error: 'resumeText and jobDescription are required' });
+  }
+
+  try {
+    const prompt = `You are an expert recruiter. Compare the candidate resume to the job description.
+Assign a suitability score from 0 to 100, where 100 is a perfect match.
+
+Job Description:
+"""
+${jobDescription}
+"""
+
+Candidate Resume:
+"""
+${resumeText}
+"""
+
+Return only a JSON object with a "score" field containing the numeric score, e.g. {"score": 75}`;
+
+    const response = await callVertexAI(prompt);
+    const result = extractJSON(response);
+    res.json({ score: result.score || 0 });
+  } catch (err) {
+    console.error('POST /api/ai/calculate-match error:', err);
+    res.json({ score: 0 }); // Return 0 on error, don't fail the whole request
+  }
+});
+
+// POST /api/ai/summarize-notes - Summarize interview transcript/notes
+app.post('/api/ai/summarize-notes', proxyLimiter, authenticateToken, async (req, res) => {
+  const { transcript } = req.body;
+  if (!transcript) return res.status(400).json({ error: 'transcript is required' });
+
+  try {
+    const prompt = `You are an expert recruiter. Below is a transcript or raw notes from an interview.
+Please provide a concise, professional summary of the interview.
+Focus on:
+1. Key strengths mentioned
+2. Potential concerns or red flags
+3. Overall recommendation
+
+Transcript:
+"""
+${transcript}
+"""`;
+
+    const summary = await callVertexAI(prompt);
+    res.json({ summary });
+  } catch (err) {
+    console.error('POST /api/ai/summarize-notes error:', err);
+    res.status(500).json({ error: 'Failed to summarize notes', details: err.message });
+  }
+});
+
+// ============================================================================
 // STATIC FILE SERVING
 // ============================================================================
 
