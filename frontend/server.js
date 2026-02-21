@@ -14,6 +14,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
 import { GoogleAuth } from 'google-auth-library';
+import { GoogleGenerativeAI } from '@google/generative-ai';
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -32,6 +33,16 @@ const JWT_EXPIRES_IN = '7d';
 const isProduction = process.env.NODE_ENV === 'production';
 const GOOGLE_CLOUD_LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
 const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
+const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+
+// Initialize Google Generative AI client
+let genAI = null;
+if (GOOGLE_API_KEY) {
+  genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
+  console.log('[AI] Google Generative AI initialized with API key');
+} else {
+  console.warn('[AI] GOOGLE_API_KEY not set - AI features will be limited');
+}
 
 // Middleware
 app.use(cors());
@@ -723,38 +734,25 @@ app.post('/api-proxy', proxyLimiter, async (req, res) => {
 });
 
 // ============================================================================
-// AI EXTRACTION ENDPOINTS (Server-side Vertex AI calls)
+// AI EXTRACTION ENDPOINTS (Server-side Gemini API calls)
 // ============================================================================
 
-// Helper function to call Vertex AI
-async function callVertexAI(prompt, model = 'gemini-1.5-flash-002') {
-  const accessToken = await getAccessToken(null);
-  if (!accessToken) throw new Error('Failed to get access token');
-
-  // Use regional Vertex AI endpoint
-  const apiUrl = `https://${GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/publishers/google/models/${model}:generateContent`;
-
-  const response = await fetch(apiUrl, {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${accessToken}`,
-      'X-Goog-User-Project': GOOGLE_CLOUD_PROJECT,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      contents: [{ role: 'user', parts: [{ text: prompt }] }],
-      generationConfig: { temperature: 0.7, maxOutputTokens: 4096 }
-    })
-  });
-
-  if (!response.ok) {
-    const error = await response.text();
-    console.error('[AI] Vertex AI error:', error);
-    throw new Error(`Vertex AI error: ${response.status}`);
+// Helper function to call Gemini AI via Google Generative AI SDK
+async function callGeminiAI(prompt, modelName = 'gemini-1.5-flash') {
+  if (!genAI) {
+    throw new Error('Google Generative AI not initialized - GOOGLE_API_KEY not set');
   }
 
-  const data = await response.json();
-  return data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+  try {
+    const model = genAI.getGenerativeModel({ model: modelName });
+    const result = await model.generateContent(prompt);
+    const response = await result.response;
+    const text = response.text();
+    return text || '';
+  } catch (err) {
+    console.error('[AI] Gemini API error:', err.message);
+    throw new Error(`Gemini API error: ${err.message}`);
+  }
 }
 
 // Helper to extract JSON from AI response
@@ -779,7 +777,7 @@ ${resumeText}
 
 Return only the JSON object, no additional text.`;
 
-    const response = await callVertexAI(prompt);
+    const response = await callGeminiAI(prompt);
     const extracted = extractJSON(response);
     res.json(extracted);
   } catch (err) {
@@ -797,7 +795,7 @@ app.post('/api/ai/extract-job', proxyLimiter, authenticateToken, async (req, res
     const prompt = `Extract job details from the following text and return as JSON with fields: title, salaryMin (number), salaryMax (number), salaryUnit (Annually or Per Hour), type (Full-time, Part-time, Contract, Contract-to-hire, or Intern), mode (Remote, Hybrid, or On-site), description. Text: ${text}
 
 Return only the JSON object, no additional text.`;
-    const response = await callVertexAI(prompt);
+    const response = await callGeminiAI(prompt);
     res.json(extractJSON(response));
   } catch (err) {
     console.error('POST /api/ai/extract-job error:', err);
@@ -812,7 +810,7 @@ app.post('/api/ai/generate-job-description', proxyLimiter, authenticateToken, as
 
   try {
     const aiPrompt = `Generate a professional job description based on this input: ${prompt}. Include sections for Responsibilities, Requirements, and Benefits. Format it nicely with headers and bullet points.`;
-    const description = await callVertexAI(aiPrompt);
+    const description = await callGeminiAI(aiPrompt);
     res.json({ description });
   } catch (err) {
     console.error('POST /api/ai/generate-job-description error:', err);
@@ -843,7 +841,7 @@ ${resumeText}
 
 Return only a JSON object with a "score" field containing the numeric score, e.g. {"score": 75}`;
 
-    const response = await callVertexAI(prompt);
+    const response = await callGeminiAI(prompt);
     const result = extractJSON(response);
     res.json({ score: result.score || 0 });
   } catch (err) {
@@ -870,7 +868,7 @@ Transcript:
 ${transcript}
 """`;
 
-    const summary = await callVertexAI(prompt);
+    const summary = await callGeminiAI(prompt);
     res.json({ summary });
   } catch (err) {
     console.error('POST /api/ai/summarize-notes error:', err);
