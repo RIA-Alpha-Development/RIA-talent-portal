@@ -727,12 +727,12 @@ app.post('/api-proxy', proxyLimiter, async (req, res) => {
 // ============================================================================
 
 // Helper function to call Vertex AI
-async function callVertexAI(prompt, model = 'gemini-1.5-flash') {
+async function callVertexAI(prompt, model = 'gemini-1.5-flash-002') {
   const accessToken = await getAccessToken(null);
   if (!accessToken) throw new Error('Failed to get access token');
 
   // Use regional Vertex AI endpoint
-  const apiUrl = `https://${GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/publishers/google/models/${model}:generateContent`;
+  const apiUrl = `https://${GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1/projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/publishers/google/models/${model}:generateContent`;
 
   const response = await fetch(apiUrl, {
     method: 'POST',
