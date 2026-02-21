@@ -2,37 +2,40 @@
 import React, { useState } from 'react';
 import { TrendingUp, Lock, Mail, ChevronRight, AlertCircle, Eye, EyeOff, RefreshCw } from 'lucide-react';
 import { User } from '../types';
+import { apiService } from '../services/apiService';
 
 interface LoginProps {
   onLogin: (user: User) => void;
   users: User[];
 }
 
-const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
+const Login: React.FC<LoginProps> = ({ onLogin }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [error, setError] = useState('');
+  const [isLoading, setIsLoading] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    // Case-insensitive email check
-    const user = users.find(u => u.email.toLowerCase() === email.toLowerCase());
-    
-    if (!user) {
-      setError('User not found. Please check the email address.');
-      return;
-    }
+    setError('');
+    setIsLoading(true);
 
-    if (user.status === 'Inactive') {
-      setError('This account has been deactivated. Please contact an administrator.');
-      return;
-    }
-
-    if (user.password === password) {
+    try {
+      const response = await apiService.login(email, password);
+      // Convert API response to User type expected by onLogin
+      const user: User = {
+        id: response.user.id,
+        name: response.user.name,
+        email: response.user.email,
+        role: response.user.role as 'ADMIN' | 'HR' | 'BUSINESS' | 'EXTERNAL',
+        status: response.user.status as 'Active' | 'Inactive',
+      };
       onLogin(user);
-    } else {
-      setError('Invalid password. Please try again.');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Login failed. Please try again.');
+    } finally {
+      setIsLoading(false);
     }
   };
 
@@ -104,12 +107,13 @@ const Login: React.FC<LoginProps> = ({ onLogin, users }) => {
               </div>
             </div>
 
-            <button 
+            <button
               type="submit"
-              className="w-full bg-[#002b5c] text-white py-4 rounded font-bold uppercase tracking-widest text-sm hover:bg-[#c5a059] hover:text-[#002b5c] transition-all shadow-lg flex items-center justify-center gap-2 group"
+              disabled={isLoading}
+              className="w-full bg-[#002b5c] text-white py-4 rounded font-bold uppercase tracking-widest text-sm hover:bg-[#c5a059] hover:text-[#002b5c] transition-all shadow-lg flex items-center justify-center gap-2 group disabled:opacity-50 disabled:cursor-not-allowed"
             >
-              Sign In
-              <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />
+              {isLoading ? 'Signing In...' : 'Sign In'}
+              {!isLoading && <ChevronRight size={18} className="group-hover:translate-x-1 transition-transform" />}
             </button>
           </form>
 
