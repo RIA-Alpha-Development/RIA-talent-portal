@@ -20,7 +20,7 @@ WORKDIR /app
 COPY package.json package-lock.json* ./
 
 # Install dependencies
-RUN npm ci --legacy-peer-deps
+RUN npm install --legacy-peer-deps
 
 # ============================================================================
 # Stage 2: Development
@@ -105,7 +105,7 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 # Copy package files and install production dependencies only
 COPY --from=builder /app/package*.json ./
-RUN npm ci --only=production --legacy-peer-deps
+RUN npm install --omit=dev --legacy-peer-deps
 
 # Copy built assets
 COPY --from=builder /app/dist ./dist
