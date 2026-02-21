@@ -731,8 +731,8 @@ async function callVertexAI(prompt, model = 'gemini-1.5-flash') {
   const accessToken = await getAccessToken(null);
   if (!accessToken) throw new Error('Failed to get access token');
 
-  // Use the same URL format as the working proxy (clients6.google.com)
-  const apiUrl = `https://aiplatform.clients6.google.com/v1/projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/publishers/google/models/${model}:generateContent`;
+  // Use regional Vertex AI endpoint
+  const apiUrl = `https://${GOOGLE_CLOUD_LOCATION}-aiplatform.googleapis.com/v1beta1/projects/${GOOGLE_CLOUD_PROJECT}/locations/${GOOGLE_CLOUD_LOCATION}/publishers/google/models/${model}:generateContent`;
 
   const response = await fetch(apiUrl, {
     method: 'POST',
