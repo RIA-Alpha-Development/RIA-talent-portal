@@ -1,0 +1,51 @@
+# RIA Talent Portal - Local Development Stack
+# Run with: docker compose up --build
+
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:14
+    container_name: ria-postgres
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: localpass
+      POSTGRES_DB: ria_ats
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # RIA Talent Portal Application
+  app:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: staging
+    container_name: ria-app
+    ports:
+      - "8080:8080"
+    environment:
+      NODE_ENV: staging
+      PORT: 8080
+      DB_HOST: postgres
+      DB_USER: postgres
+      DB_PASSWORD: localpass
+      DB_NAME: ria_ats
+      JWT_SECRET: local-dev-jwt-secret-change-in-production
+      GOOGLE_CLOUD_PROJECT: ${GOOGLE_CLOUD_PROJECT:-simplevisormvp}
+      GOOGLE_CLOUD_LOCATION: us-central1
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+
+volumes:
+  postgres_data:

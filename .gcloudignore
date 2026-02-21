@@ -1,0 +1,43 @@
+# Ignore everything except what Cloud Build needs
+.git
+.gitignore
+.github
+
+# Node modules (will be installed during build)
+node_modules
+**/node_modules
+
+# Local environment files
+.env
+.env.local
+.env.*.local
+**/.env
+**/.env.local
+
+# IDE
+.vscode
+.idea
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Build outputs (will be created during build)
+dist
+build
+.vite
+
+# Test files
+coverage
+**/*.test.ts
+**/*.test.tsx
+**/*.spec.ts
+**/*.spec.tsx
+
+# Documentation (not needed for build)
+*.md
+docs
+
+# Misc
+*.log
+.eslintcache
