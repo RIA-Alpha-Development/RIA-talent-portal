@@ -42,7 +42,7 @@ steps:
       - '--timeout=300s'
       - '--add-cloudsql-instances=${_INSTANCE_CONNECTION_NAME}'
       - '--update-env-vars=NODE_ENV=production,DB_NAME=ria_ats,DB_USER=postgres,INSTANCE_CONNECTION_NAME=${_INSTANCE_CONNECTION_NAME},GOOGLE_CLOUD_PROJECT=$PROJECT_ID,GOOGLE_CLOUD_LOCATION=us-central1'
-      - '--update-secrets=DB_PASSWORD=ria-db-password:latest,JWT_SECRET=ria-jwt-secret:latest'
+      - '--update-secrets=DB_PASSWORD=db-password:latest,JWT_SECRET=jwt-secret:latest'
       - '--no-traffic'
 
   # Switch 100% traffic to the new revision (blue-green deployment)
@@ -57,7 +57,7 @@ steps:
 
 # Substitution variables - override these when running the build
 substitutions:
-  _INSTANCE_CONNECTION_NAME: 'simplevisormvp:us-central1:ria-talent-db'
+  _INSTANCE_CONNECTION_NAME: 'simplevisormvp:us-central1:simplevisor-db'
 
 # Store the built image
 images:
