@@ -23,6 +23,8 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({ jobs, onClose, on
   const [error, setError] = useState<string | null>(null);
   const [file, setFile] = useState<File | null>(null);
   const [extractedText, setExtractedText] = useState<string>('');
+  const [resumeUrl, setResumeUrl] = useState<string>('');
+  const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const [formData, setFormData] = useState<Partial<Candidate>>({
@@ -92,6 +94,18 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({ jobs, onClose, on
       let text = '';
       const fileName = selectedFile.name.toLowerCase();
 
+      // Check for legacy .doc format (not supported by mammoth)
+      if (fileName.endsWith('.doc') && !fileName.endsWith('.docx')) {
+        throw new Error(
+          'Legacy .doc format is not supported.\n\n' +
+          'Please save your document as:\n' +
+          '• .docx (Word 2007 or later)\n' +
+          '• .pdf\n' +
+          '• .txt\n\n' +
+          'In Word: File → Save As → Word Document (.docx)'
+        );
+      }
+
       if (fileName.endsWith('.docx')) {
         const arrayBuffer = await selectedFile.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });
@@ -111,15 +125,28 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({ jobs, onClose, on
 
       setExtractedText(text);
       const extracted = await apiService.extractCandidateDetails(text);
-      
+
       if (!extracted || (!extracted.name && !extracted.email)) {
         throw new Error('AI was unable to identify key information (Name/Email) from this document.');
+      }
+
+      // Upload file to GCS (non-blocking - continue even if upload fails)
+      setIsUploading(true);
+      let uploadedUrl = '';
+      try {
+        uploadedUrl = await apiService.uploadFile(selectedFile);
+        setResumeUrl(uploadedUrl);
+      } catch (uploadErr) {
+        console.warn('File upload failed, continuing without storage:', uploadErr);
+      } finally {
+        setIsUploading(false);
       }
 
       setFormData(prev => ({
         ...prev,
         ...extracted,
-        resumeFileName: selectedFile.name
+        resumeFileName: selectedFile.name,
+        resumeUrl: uploadedUrl
       }));
       setStep('review');
     } catch (err: any) {
@@ -148,6 +175,7 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({ jobs, onClose, on
       summary: formData.summary || '',
       skills: formData.skills || [],
       resumeFileName: formData.resumeFileName,
+      resumeUrl: resumeUrl || formData.resumeUrl,
       currentStage: CandidateStage.APPLIED,
       appliedAt: new Date().toISOString(),
       matchScore: formData.matchScore,

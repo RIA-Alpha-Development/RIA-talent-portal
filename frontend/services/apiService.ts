@@ -347,4 +347,61 @@ export const apiService = {
     const data = await res.json();
     return data.summary;
   },
+
+  // ========== File Upload ==========
+
+  async getUploadSignedUrl(
+    fileName: string,
+    contentType: string,
+    candidateId?: string
+  ): Promise<{
+    signedUrl: string;
+    fileUrl: string;
+    filePath: string;
+    expiresAt: string;
+  }> {
+    const res = await fetchWithAuth(`${API_BASE}/uploads/signed-url`, {
+      method: 'POST',
+      body: JSON.stringify({ fileName, contentType, candidateId }),
+    });
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Failed to get upload URL' }));
+      throw new Error(error.error || 'Failed to get upload URL');
+    }
+    return res.json();
+  },
+
+  async uploadFile(file: File, candidateId?: string): Promise<string> {
+    // Get signed URL from backend
+    const { signedUrl, fileUrl } = await this.getUploadSignedUrl(
+      file.name,
+      file.type,
+      candidateId
+    );
+
+    // Upload directly to GCS using signed URL
+    const uploadRes = await fetch(signedUrl, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': file.type,
+      },
+      body: file,
+    });
+
+    if (!uploadRes.ok) {
+      throw new Error('Failed to upload file to storage');
+    }
+
+    return fileUrl;
+  },
+
+  async getDownloadUrl(candidateId: string): Promise<string> {
+    const res = await fetchWithAuth(`${API_BASE}/uploads/download-url/${candidateId}`);
+    if (!res.ok) {
+      const error = await res.json().catch(() => ({ error: 'Failed to get download URL' }));
+      throw new Error(error.error || 'Failed to get download URL');
+    }
+    const data = await res.json();
+    return data.downloadUrl;
+  },
 };

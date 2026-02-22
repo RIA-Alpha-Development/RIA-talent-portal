@@ -40,8 +40,11 @@ const App: React.FC = () => {
   const [rolePermissions, setRolePermissions] = useState<RolePermissions>(DEFAULT_PERMISSIONS);
   const [isLoading, setIsLoading] = useState(true);
 
-  // Initialize data from API (Cloud SQL) with Local Fallback
+  // Initialize data from API (Cloud SQL)
   useEffect(() => {
+    // One-time cleanup of deprecated localStorage keys
+    ['tf_jobs', 'tf_candidates', 'tf_users'].forEach(key => localStorage.removeItem(key));
+
     const loadData = async () => {
       try {
         const [fetchedJobs, fetchedCandidates, fetchedUsers] = await Promise.all([
@@ -53,14 +56,10 @@ const App: React.FC = () => {
         setCandidates(fetchedCandidates);
         setUsers(fetchedUsers);
       } catch (err) {
-        console.warn('Backend API not available, falling back to local storage.');
-        const savedJobs = localStorage.getItem('tf_jobs');
-        const savedCandidates = localStorage.getItem('tf_candidates');
-        const savedUsers = localStorage.getItem('tf_users');
-        
-        setJobs(savedJobs ? JSON.parse(savedJobs) : SEED_JOBS);
-        setCandidates(savedCandidates ? JSON.parse(savedCandidates) : SEED_CANDIDATES);
-        setUsers(savedUsers ? JSON.parse(savedUsers) : SEED_USERS);
+        console.error('Failed to load data from API:', err);
+        setJobs([]);
+        setCandidates([]);
+        setUsers([]);
       }
 
       const savedUser = localStorage.getItem('tf_user');
@@ -89,8 +88,7 @@ const App: React.FC = () => {
 
   const addJob = async (job: Job) => {
     setJobs(prev => [job, ...prev]);
-    localStorage.setItem('tf_jobs', JSON.stringify([job, ...jobs]));
-    try { await apiService.createJob(job); } catch (e) {}
+    try { await apiService.createJob(job); } catch (e) { console.error('Failed to create job:', e); }
   };
 
   const updateJob = async (updatedJob: Job) => {
@@ -100,8 +98,7 @@ const App: React.FC = () => {
 
   const addCandidate = async (candidate: Candidate) => {
     setCandidates(prev => [candidate, ...prev]);
-    localStorage.setItem('tf_candidates', JSON.stringify([candidate, ...candidates]));
-    try { await apiService.createCandidate(candidate); } catch (e) {}
+    try { await apiService.createCandidate(candidate); } catch (e) { console.error('Failed to create candidate:', e); }
   };
 
   const updateCandidate = async (updatedCandidate: Candidate) => {

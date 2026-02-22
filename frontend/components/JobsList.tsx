@@ -130,6 +130,21 @@ const JobsList: React.FC<JobsListProps> = ({
     try {
       let text = '';
       const fileName = file.name.toLowerCase();
+
+      // Check for legacy .doc format (not supported by mammoth)
+      if (fileName.endsWith('.doc') && !fileName.endsWith('.docx')) {
+        alert(
+          'Legacy .doc format is not supported.\n\n' +
+          'Please save your document as:\n' +
+          '• .docx (Word 2007 or later)\n' +
+          '• .pdf\n' +
+          '• .txt\n\n' +
+          'In Word: File → Save As → Word Document (.docx)'
+        );
+        setIsLoading(false);
+        return;
+      }
+
       if (fileName.endsWith('.docx')) {
         const arrayBuffer = await file.arrayBuffer();
         const result = await mammoth.extractRawText({ arrayBuffer });

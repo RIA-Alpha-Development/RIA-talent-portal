@@ -19,6 +19,7 @@ import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
 import cors from 'cors';
+import { Storage } from '@google-cloud/storage';
 
 const { Pool } = pg;
 const __filename = fileURLToPath(import.meta.url);
@@ -42,6 +43,18 @@ if (GOOGLE_API_KEY) {
   console.log('[AI] Google Generative AI initialized with API key');
 } else {
   console.warn('[AI] GOOGLE_API_KEY not set - AI features will be limited');
+}
+
+// Initialize Google Cloud Storage client
+const GCS_BUCKET_NAME = process.env.GCS_BUCKET_NAME || 'ria-talent-portal-resumes';
+let storage = null;
+let bucket = null;
+try {
+  storage = new Storage();
+  bucket = storage.bucket(GCS_BUCKET_NAME);
+  console.log('[GCS] Google Cloud Storage initialized with bucket:', GCS_BUCKET_NAME);
+} catch (err) {
+  console.warn('[GCS] Failed to initialize Google Cloud Storage:', err.message);
 }
 
 // Middleware
@@ -873,6 +886,115 @@ ${transcript}
   } catch (err) {
     console.error('POST /api/ai/summarize-notes error:', err);
     res.status(500).json({ error: 'Failed to summarize notes', details: err.message });
+  }
+});
+
+// ============================================================================
+// FILE UPLOAD ENDPOINTS (GCS)
+// ============================================================================
+
+// POST /api/uploads/signed-url - Generate signed URL for file upload
+app.post('/api/uploads/signed-url', apiLimiter, authenticateToken, async (req, res) => {
+  if (!bucket) {
+    return res.status(503).json({ error: 'File storage not configured' });
+  }
+
+  const { fileName, contentType, candidateId } = req.body;
+
+  // Validate file type
+  const allowedTypes = [
+    'application/pdf',
+    'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+    'text/plain'
+  ];
+
+  if (!allowedTypes.includes(contentType)) {
+    return res.status(400).json({
+      error: 'Invalid file type. Allowed: PDF, DOCX, TXT'
+    });
+  }
+
+  // Validate file name
+  if (!fileName || fileName.length > 255) {
+    return res.status(400).json({ error: 'Invalid file name' });
+  }
+
+  const maxSize = 10 * 1024 * 1024; // 10MB
+  const timestamp = Date.now();
+  const sanitizedFileName = fileName.replace(/[^a-zA-Z0-9.-]/g, '_');
+  const filePath = `resumes/${candidateId || 'temp'}/${timestamp}-${sanitizedFileName}`;
+
+  try {
+    const file = bucket.file(filePath);
+
+    const [signedUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'write',
+      expires: Date.now() + 15 * 60 * 1000, // 15 minutes
+      contentType: contentType,
+      extensionHeaders: {
+        'x-goog-content-length-range': `0,${maxSize}`
+      }
+    });
+
+    const publicUrl = `https://storage.googleapis.com/${GCS_BUCKET_NAME}/${filePath}`;
+
+    res.json({
+      signedUrl,
+      fileUrl: publicUrl,
+      filePath,
+      expiresAt: new Date(Date.now() + 15 * 60 * 1000).toISOString()
+    });
+  } catch (err) {
+    console.error('POST /api/uploads/signed-url error:', err);
+    res.status(500).json({ error: 'Failed to generate upload URL', details: err.message });
+  }
+});
+
+// GET /api/uploads/download-url/:candidateId - Get signed download URL for resume
+app.get('/api/uploads/download-url/:candidateId', apiLimiter, authenticateToken, async (req, res) => {
+  if (!bucket) {
+    return res.status(503).json({ error: 'File storage not configured' });
+  }
+
+  const { candidateId } = req.params;
+
+  try {
+    // Get candidate to find resume URL
+    const result = await pool.query(
+      'SELECT resume_url FROM candidates WHERE id = $1',
+      [candidateId]
+    );
+
+    if (result.rows.length === 0) {
+      return res.status(404).json({ error: 'Candidate not found' });
+    }
+
+    const resumeUrl = result.rows[0].resume_url;
+    if (!resumeUrl) {
+      return res.status(404).json({ error: 'Resume not found for this candidate' });
+    }
+
+    // Extract file path from URL
+    const urlPrefix = `https://storage.googleapis.com/${GCS_BUCKET_NAME}/`;
+    if (!resumeUrl.startsWith(urlPrefix)) {
+      // Return the URL directly if it's not a GCS URL (e.g., external link)
+      return res.json({ downloadUrl: resumeUrl });
+    }
+
+    const filePath = resumeUrl.replace(urlPrefix, '');
+    const file = bucket.file(filePath);
+
+    const [signedUrl] = await file.getSignedUrl({
+      version: 'v4',
+      action: 'read',
+      expires: Date.now() + 60 * 60 * 1000 // 1 hour
+    });
+
+    res.json({ downloadUrl: signedUrl });
+  } catch (err) {
+    console.error('GET /api/uploads/download-url error:', err);
+    res.status(500).json({ error: 'Failed to generate download URL', details: err.message });
   }
 });
 

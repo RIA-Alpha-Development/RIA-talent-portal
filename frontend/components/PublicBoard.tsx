@@ -1,7 +1,8 @@
 
-import React, { useState } from 'react';
+import React, { useState, useRef } from 'react';
 import { Job, Candidate, CandidateStage, User, UserRole } from '../types';
-import { MapPin, DollarSign, Briefcase, ChevronRight, ArrowLeft, Send, TrendingUp, ShieldCheck, Award, Zap } from 'lucide-react';
+import { MapPin, DollarSign, Briefcase, ChevronRight, ArrowLeft, Send, TrendingUp, ShieldCheck, Award, Zap, Upload, Loader2 } from 'lucide-react';
+import { apiService } from '../services/apiService';
 
 interface PublicBoardProps {
   jobs: Job[];
@@ -12,12 +13,16 @@ interface PublicBoardProps {
 const PublicBoard: React.FC<PublicBoardProps> = ({ jobs, onApply, currentUser }) => {
   const [selectedJob, setSelectedJob] = useState<Job | null>(null);
   const [isApplying, setIsApplying] = useState(false);
-  const [formData, setFormData] = useState({ 
-    name: currentUser?.name || '', 
-    email: currentUser?.email || '', 
-    resume: currentUser?.profile?.resumeFileName || '' 
+  const [formData, setFormData] = useState({
+    name: currentUser?.name || '',
+    email: currentUser?.email || '',
+    resume: currentUser?.profile?.resumeFileName || ''
   });
   const [submitted, setSubmitted] = useState(false);
+  const [resumeFile, setResumeFile] = useState<File | null>(null);
+  const [isUploading, setIsUploading] = useState(false);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const isExternal = currentUser?.role === UserRole.EXTERNAL;
 
@@ -27,9 +32,28 @@ const PublicBoard: React.FC<PublicBoardProps> = ({ jobs, onApply, currentUser })
     return `$${min} - $${max} ${job.salaryUnit}`;
   };
 
-  const handleApply = (e: React.FormEvent) => {
+  const handleApply = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!selectedJob) return;
+
+    setUploadError(null);
+    let resumeUrl = '';
+    let resumeFileName = formData.resume;
+
+    // Upload file if selected
+    if (resumeFile) {
+      setIsUploading(true);
+      try {
+        resumeUrl = await apiService.uploadFile(resumeFile);
+        resumeFileName = resumeFile.name;
+      } catch (err: any) {
+        console.error('Upload failed:', err);
+        setUploadError('Failed to upload resume. Please try again.');
+        setIsUploading(false);
+        return;
+      }
+      setIsUploading(false);
+    }
 
     const newCandidate: Candidate = {
       id: Math.random().toString(36).substr(2, 9),
@@ -38,7 +62,8 @@ const PublicBoard: React.FC<PublicBoardProps> = ({ jobs, onApply, currentUser })
       email: formData.email,
       currentStage: CandidateStage.APPLIED,
       appliedAt: new Date().toISOString(),
-      resumeFileName: formData.resume,
+      resumeFileName: resumeFileName,
+      resumeUrl: resumeUrl,
       history: [{
         id: Math.random().toString(36).substr(2, 9),
         stage: CandidateStage.APPLIED,
@@ -55,6 +80,7 @@ const PublicBoard: React.FC<PublicBoardProps> = ({ jobs, onApply, currentUser })
       setSubmitted(false);
       setIsApplying(false);
       setSelectedJob(null);
+      setResumeFile(null);
       if (!isExternal) setFormData({ name: '', email: '', resume: '' });
     }, 2000);
   };
@@ -114,11 +140,57 @@ const PublicBoard: React.FC<PublicBoardProps> = ({ jobs, onApply, currentUser })
                     <div className="grid grid-cols-1 gap-6">
                       <div><label className="block text-xs font-bold text-[#002b5c] uppercase tracking-widest mb-2">Full Name</label><input required type="text" disabled={isExternal} value={formData.name} onChange={(e) => setFormData({...formData, name: e.target.value})} className="w-full p-4 border border-slate-200 rounded focus:ring-2 focus:ring-[#c5a059] outline-none transition-all bg-slate-50 disabled:opacity-60" placeholder="Enter your full name" /></div>
                       <div><label className="block text-xs font-bold text-[#002b5c] uppercase tracking-widest mb-2">Email Address</label><input required type="email" disabled={isExternal} value={formData.email} onChange={(e) => setFormData({...formData, email: e.target.value})} className="w-full p-4 border border-slate-200 rounded focus:ring-2 focus:ring-[#c5a059] outline-none transition-all bg-slate-50 disabled:opacity-60" placeholder="email@example.com" /></div>
-                      <div><label className="block text-xs font-bold text-[#002b5c] uppercase tracking-widest mb-2">Resume / Portfolio Link</label><input required type="text" value={formData.resume} onChange={(e) => setFormData({...formData, resume: e.target.value})} className="w-full p-4 border border-slate-200 rounded focus:ring-2 focus:ring-[#c5a059] outline-none transition-all bg-slate-50" placeholder="Link to your LinkedIn or Resume" /></div>
+                      <div>
+                        <label className="block text-xs font-bold text-[#002b5c] uppercase tracking-widest mb-2">Resume Upload</label>
+                        <div className="relative">
+                          <input
+                            type="file"
+                            ref={fileInputRef}
+                            onChange={(e) => {
+                              const file = e.target.files?.[0];
+                              if (file) {
+                                // Validate file size (10MB max)
+                                if (file.size > 10 * 1024 * 1024) {
+                                  setUploadError('File size exceeds 10MB limit');
+                                  return;
+                                }
+                                // Validate file type
+                                const validTypes = ['application/pdf', 'application/vnd.openxmlformats-officedocument.wordprocessingml.document', 'text/plain'];
+                                if (!validTypes.includes(file.type)) {
+                                  setUploadError('Please upload a PDF, DOCX, or TXT file');
+                                  return;
+                                }
+                                setResumeFile(file);
+                                setUploadError(null);
+                              }
+                            }}
+                            accept=".pdf,.docx,.txt"
+                            className="w-full p-4 border border-slate-200 rounded focus:ring-2 focus:ring-[#c5a059] outline-none transition-all bg-slate-50 file:mr-4 file:py-2 file:px-4 file:rounded file:border-0 file:text-sm file:font-semibold file:bg-[#002b5c] file:text-white hover:file:bg-[#c5a059] hover:file:text-[#002b5c]"
+                          />
+                          {resumeFile && (
+                            <p className="text-xs text-emerald-600 mt-1 flex items-center gap-1">
+                              <Upload size={12} /> {resumeFile.name}
+                            </p>
+                          )}
+                          {uploadError && (
+                            <p className="text-xs text-red-500 mt-1">{uploadError}</p>
+                          )}
+                          <p className="text-xs text-slate-400 mt-1">Supported: PDF, DOCX, TXT (max 10MB)</p>
+                        </div>
+                      </div>
                     </div>
                     <div className="flex gap-4 pt-6">
-                      <button type="button" onClick={() => setIsApplying(false)} className="flex-1 py-4 text-slate-500 font-bold uppercase tracking-widest text-xs hover:text-[#002b5c]">Cancel</button>
-                      <button type="submit" className="flex-1 bg-[#002b5c] text-white py-4 rounded font-bold uppercase tracking-widest text-xs hover:bg-[#c5a059] hover:text-[#002b5c] shadow-lg">{isExternal ? 'Confirm & Apply' : 'Submit Application'}</button>
+                      <button type="button" onClick={() => setIsApplying(false)} disabled={isUploading} className="flex-1 py-4 text-slate-500 font-bold uppercase tracking-widest text-xs hover:text-[#002b5c] disabled:opacity-50">Cancel</button>
+                      <button type="submit" disabled={isUploading || (!resumeFile && !formData.resume)} className="flex-1 bg-[#002b5c] text-white py-4 rounded font-bold uppercase tracking-widest text-xs hover:bg-[#c5a059] hover:text-[#002b5c] shadow-lg disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-2">
+                        {isUploading ? (
+                          <>
+                            <Loader2 size={16} className="animate-spin" />
+                            Uploading...
+                          </>
+                        ) : (
+                          isExternal ? 'Confirm & Apply' : 'Submit Application'
+                        )}
+                      </button>
                     </div>
                   </form>
                 </>
