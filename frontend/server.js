@@ -751,7 +751,7 @@ app.post('/api-proxy', proxyLimiter, async (req, res) => {
 // ============================================================================
 
 // Helper function to call Gemini AI via Google Generative AI SDK
-async function callGeminiAI(prompt, modelName = 'gemini-1.5-flash') {
+async function callGeminiAI(prompt, modelName = 'gemini-pro') {
   if (!genAI) {
     throw new Error('Google Generative AI not initialized - GOOGLE_API_KEY not set');
   }
