@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Job, Candidate, CandidateStage, User } from '../types';
+import { Job, Candidate, CandidateStage, User, UserRole } from '../types';
 import { Users, Briefcase, CheckCircle2, Clock, TrendingUp, Calendar, Timer, Database, ShieldCheck } from 'lucide-react';
 
 interface DashboardProps {
@@ -150,9 +150,9 @@ const Dashboard: React.FC<DashboardProps> = ({ jobs, candidates, currentUser }) 
                     </div>
                   </div>
                   <div className="flex items-center gap-4">
-                    {candidate.matchScore !== undefined && (
+                    {currentUser.role === UserRole.HR && candidate.matchScore !== undefined && (
                       <div className="text-right">
-                        <p className="text-[10px] font-bold text-[#002b5c] uppercase tracking-widest">Match</p>
+                        <p className="text-[10px] font-bold text-[#002b5c] uppercase tracking-widest">Keyword Match</p>
                         <p className="text-xs font-bold text-emerald-600">{candidate.matchScore}%</p>
                       </div>
                     )}

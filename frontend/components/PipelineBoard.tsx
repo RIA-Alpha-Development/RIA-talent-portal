@@ -318,18 +318,18 @@ const PipelineBoard: React.FC<PipelineBoardProps> = ({
                       )}
                     </div>
                     
-                    {/* Match Score Indicator */}
-                    {candidate.matchScore !== undefined && (
+                    {/* Keyword Match Score - HR only */}
+                    {userRole === UserRole.HR && candidate.matchScore !== undefined && (
                       <div className="mb-3">
                         <div className="flex items-center justify-between mb-1">
                           <div className="flex items-center gap-1 text-[9px] font-bold text-slate-400 uppercase tracking-widest">
                             <BrainCircuit size={10} className="text-[#002b5c]" />
-                            AI Match
+                            Keyword Match
                           </div>
                           <span className="text-[10px] font-bold text-[#002b5c]">{candidate.matchScore}%</span>
                         </div>
                         <div className="w-full h-1 bg-slate-100 rounded-full overflow-hidden">
-                          <div 
+                          <div
                             className={`h-full transition-all duration-500 ${getScoreColor(candidate.matchScore)}`}
                             style={{ width: `${candidate.matchScore}%` }}
                           />
@@ -376,10 +376,10 @@ const PipelineBoard: React.FC<PipelineBoardProps> = ({
                 <div>
                   <div className="flex items-center gap-3">
                     <h2 className="text-2xl font-serif font-bold text-[#002b5c]">{selectedCandidate.name}</h2>
-                    {selectedCandidate.matchScore !== undefined && (
+                    {userRole === UserRole.HR && selectedCandidate.matchScore !== undefined && (
                       <div className="flex items-center gap-1.5 px-2 py-1 bg-[#002b5c]/5 border border-[#002b5c]/10 rounded-lg">
                         <BrainCircuit size={14} className="text-[#002b5c]" />
-                        <span className="text-xs font-bold text-[#002b5c]">{selectedCandidate.matchScore}% Match</span>
+                        <span className="text-xs font-bold text-[#002b5c]">{selectedCandidate.matchScore}% Keyword Match</span>
                       </div>
                     )}
                   </div>

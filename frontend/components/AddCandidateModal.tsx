@@ -183,7 +183,7 @@ const AddCandidateModal: React.FC<AddCandidateModalProps> = ({ jobs, onClose, on
         id: Math.random().toString(36).substr(2, 9),
         stage: CandidateStage.APPLIED,
         timestamp: new Date().toISOString(),
-        note: `Candidate added via document upload. AI Match Score: ${formData.matchScore}%`
+        note: `Candidate added via document upload. Keyword Match: ${formData.matchScore}%`
       }]
     };
     onAdd(newCandidate);
