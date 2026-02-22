@@ -14,7 +14,7 @@ import path from 'path';
 import { fileURLToPath } from 'url';
 import pg from 'pg';
 import { GoogleAuth } from 'google-auth-library';
-import { GoogleGenerativeAI } from '@google/generative-ai';
+import { VertexAI } from '@google-cloud/vertexai';
 import rateLimit from 'express-rate-limit';
 import jwt from 'jsonwebtoken';
 import bcrypt from 'bcryptjs';
@@ -33,16 +33,18 @@ const JWT_EXPIRES_IN = '7d';
 // Environment configuration
 const isProduction = process.env.NODE_ENV === 'production';
 const GOOGLE_CLOUD_LOCATION = process.env.GOOGLE_CLOUD_LOCATION || 'us-central1';
-const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT;
-const GOOGLE_API_KEY = process.env.GOOGLE_API_KEY;
+const GOOGLE_CLOUD_PROJECT = process.env.GOOGLE_CLOUD_PROJECT || 'simplevisormvp';
 
-// Initialize Google Generative AI client
-let genAI = null;
-if (GOOGLE_API_KEY) {
-  genAI = new GoogleGenerativeAI(GOOGLE_API_KEY);
-  console.log('[AI] Google Generative AI initialized with API key');
-} else {
-  console.warn('[AI] GOOGLE_API_KEY not set - AI features will be limited');
+// Initialize Vertex AI client (uses ADC - Application Default Credentials)
+let vertexAI = null;
+try {
+  vertexAI = new VertexAI({
+    project: GOOGLE_CLOUD_PROJECT,
+    location: GOOGLE_CLOUD_LOCATION,
+  });
+  console.log('[AI] Vertex AI initialized for project:', GOOGLE_CLOUD_PROJECT);
+} catch (err) {
+  console.warn('[AI] Failed to initialize Vertex AI:', err.message);
 }
 
 // Initialize Google Cloud Storage client
@@ -750,21 +752,31 @@ app.post('/api-proxy', proxyLimiter, async (req, res) => {
 // AI EXTRACTION ENDPOINTS (Server-side Gemini API calls)
 // ============================================================================
 
-// Helper function to call Gemini AI via Google Generative AI SDK
-async function callGeminiAI(prompt, modelName = 'gemini-pro') {
-  if (!genAI) {
-    throw new Error('Google Generative AI not initialized - GOOGLE_API_KEY not set');
+// Helper function to call Gemini AI via Vertex AI SDK
+async function callGeminiAI(prompt, modelName = 'gemini-2.0-flash-001') {
+  if (!vertexAI) {
+    throw new Error('Vertex AI not initialized');
   }
 
   try {
-    const model = genAI.getGenerativeModel({ model: modelName });
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
-    return text || '';
+    const generativeModel = vertexAI.getGenerativeModel({
+      model: modelName,
+      generationConfig: {
+        temperature: 0.3,
+        maxOutputTokens: 4096,
+      },
+    });
+
+    const result = await generativeModel.generateContent({
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+    });
+
+    const response = result.response;
+    const text = response.candidates?.[0]?.content?.parts?.[0]?.text || '';
+    return text;
   } catch (err) {
-    console.error('[AI] Gemini API error:', err.message);
-    throw new Error(`Gemini API error: ${err.message}`);
+    console.error('[AI] Vertex AI error:', err.message);
+    throw new Error(`Vertex AI error: ${err.message}`);
   }
 }
 
