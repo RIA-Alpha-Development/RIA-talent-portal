@@ -32,19 +32,19 @@ const Dashboard: React.FC<DashboardProps> = ({ jobs, candidates, currentUser }) 
   return (
     <div className="space-y-8 animate-in fade-in duration-500">
       {/* Storage Status Banner */}
-      <div className="bg-[#002b5c] text-white p-4 rounded-xl flex items-center justify-between shadow-lg border-l-4 border-[#c5a059]">
+      <div className="bg-[#002b5c] text-white p-4 rounded-xl flex items-center justify-between shadow-lg border-l-4 border-emerald-500">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-white/10 rounded-full flex items-center justify-center">
-            <Database size={20} className="text-[#c5a059]" />
+          <div className="w-10 h-10 bg-emerald-500/20 rounded-full flex items-center justify-center">
+            <Database size={20} className="text-emerald-400" />
           </div>
           <div>
-            <p className="text-sm font-bold">Local Storage Active</p>
-            <p className="text-xs text-white/60">Your data is being saved locally to this browser. No external database is connected yet.</p>
+            <p className="text-sm font-bold">Cloud Database Connected</p>
+            <p className="text-xs text-white/60">Your data is securely stored in Google Cloud SQL with file storage in Google Cloud Storage.</p>
           </div>
         </div>
-        <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-white/10 rounded-full text-[10px] font-bold uppercase tracking-widest">
+        <div className="hidden md:flex items-center gap-2 px-3 py-1 bg-emerald-500/20 rounded-full text-[10px] font-bold uppercase tracking-widest">
           <ShieldCheck size={12} className="text-emerald-400" />
-          Secure Session
+          Secure Connection
         </div>
       </div>
 
